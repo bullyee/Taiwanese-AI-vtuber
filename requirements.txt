@@ -1,0 +1,7 @@
+pyqt6~=6.9.1
+pyqt6-sip~=13.10.2
+sounddevice~=0.5.2
+websockets~=15.0.1
+soundfile~=0.13.1
+requests~=2.32.3
+beautifulsoup4~=4.13.4
