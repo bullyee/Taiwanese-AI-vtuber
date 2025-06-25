@@ -6,7 +6,7 @@ from audio_vac import stop_playback
 
 Step   = Tuple[str, str | None]      # (字幕, wav 或 None)
 Script = List[Step]
-Item   = Tuple[str, Script]          # (標題, 整份腳本)
+Item   = Tuple[str, Script,int]          # (標題, 整份腳本)
 
 class SubtitleScheduler:
     """
@@ -27,14 +27,13 @@ class SubtitleScheduler:
         self.set_image = set_image      # Mys
         self.queue: List[Item] = []
         self.busy = False
-        self.image_index = 0    # Mys
         self.stop_flag = False
 
     # ────────── Public API ──────────
-    def enqueue(self, title: str, script: Script) -> None:
+    def enqueue(self, title: str, script: Script,idx: int) -> None:
         """把 (標題, 腳本) 丟進佇列；若空檔就立即播放。"""
         print(f"Enqueued new script: {title!r}")
-        self.queue.append((title, script))
+        self.queue.append((title, script,idx))
         if not self.busy:
             self._next_script()
 
@@ -63,11 +62,11 @@ class SubtitleScheduler:
             return
 
         self.busy = True
-        title, script = self.queue.pop(0)
-        self.image_index += 1       #Mys
+        title, script , idx= self.queue.pop(0)
         self.set_title(title)        # 更新標題
 
-        image_path = f"images/news{self.image_index}_image.jpg"
+        image_path = f"images/news{idx}_image.jpg"
+        print(f"第幾張圖片{image_path}")
         self.set_image(image_path)  # ✅ 根據第幾篇切圖片
 
         self._play_step(script, 0)   # 從第一句開始

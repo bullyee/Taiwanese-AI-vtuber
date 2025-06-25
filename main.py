@@ -27,7 +27,7 @@ from twitch_bot import Bot
 # ---------- 可自訂池子 ----------
 Step   = Tuple[str, str | None]   # (字幕, wav or None)
 Script = List[Step]               # 整篇新聞
-NewsPool: List[Tuple[str, Script]] = []   # (標題, script)
+NewsPool: List[Tuple[str, Script, int]] = []   # (標題, script)
 
 data: List[Dict[str, Any]] = json.loads(Path("news.json").read_text(encoding="utf-8"))
 
@@ -43,7 +43,7 @@ for art in data:
         )
     ]
 
-    NewsPool.append((title, script))
+    NewsPool.append((title, script, idx))
 
 print(f"已載入 {len(NewsPool)} 篇新聞")
 HOTKEY_POOL = [f"My Animation {i}" for i in range(1, 11)]
