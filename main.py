@@ -1,4 +1,9 @@
 import sys, traceback, threading
+
+import audio_vac
+from ImageWindow import ImageWindow
+
+
 def _thread_excepthook(args):
     print("⚠️  Unhandled exception in thread:", args.thread.name)
     traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback)
@@ -16,6 +21,8 @@ from scheduler        import SubtitleScheduler
 from vts_client       import VTSClient
 from typing import List, Tuple, Dict, Any
 from pathlib import Path
+
+from twitch_bot import Bot
 
 # ---------- 可自訂池子 ----------
 Step   = Tuple[str, str | None]   # (字幕, wav or None)
@@ -41,7 +48,9 @@ for art in data:
 print(f"已載入 {len(NewsPool)} 篇新聞")
 HOTKEY_POOL = [f"My Animation {i}" for i in range(1, 11)]
 
-VAC_ID   = 13               # list_devices() 查到的 index
+audio_vac.list_devices()
+
+VAC_ID   = 11               # list_devices() 查到的 index
 DEVICE_ID = VAC_ID
 
 # ---------- 啟動三大物件 ----------
@@ -49,16 +58,27 @@ app  = QApplication(sys.argv)
 win  = SubtitleWindow()
 banner = TitleBannerWidget()
 vts  = VTSClient()
-sched = SubtitleScheduler(device_id=DEVICE_ID, set_text=win.set_text, set_title = banner.set_text)
+image  = ImageWindow()
+sched = SubtitleScheduler(
+    device_id=DEVICE_ID,
+    set_text=win.set_text,
+    set_title = banner.set_text,
+    set_image = image.set_image  # ✅ 新增圖片控制 callback
+)
+
+bot = Bot(sched,NewsPool,DEVICE_ID)
+# ✅ 建立 Twitch bot 執行緒
+bot_thread = threading.Thread(target=bot.run, name="TwitchBotThread", daemon=True)
+bot_thread.start()
 
 # ---------- 3 分鐘新聞 ----------
-news_timer = QTimer()
-def play_news():
-    title, script = random.choice(NewsPool)
-    sched.enqueue(title, script)
-news_timer.timeout.connect(play_news)
-news_timer.start(3 * 60 * 1000)          # 180_000 ms
-news_timer.timeout.emit()                # 立刻播第一條（可拿掉）
+# news_timer = QTimer()
+# def play_news():
+#     title, script = random.choice(NewsPool)
+#     sched.enqueue(title, script)
+# news_timer.timeout.connect(play_news)
+# news_timer.start(3 * 60 * 1000)          # 180_000 ms
+# news_timer.timeout.emit()                # 立刻播第一條（可拿掉）
 
 # ---------- 20 秒 VTS 動畫 ----------
 anim_timer = QTimer()
