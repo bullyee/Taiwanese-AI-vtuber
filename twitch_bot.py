@@ -24,24 +24,32 @@ openai.api_key = os.getenv("OPENROUTER_API_KEY")
 openai.api_base = "https://openrouter.ai/api/v1"
 
 def classify_message_sync(message: str) -> str:
-    prompt = f"""你是虛擬主播的 AI 助理，請根據觀眾說的話，判斷出一個最適合的「回應類型」標籤，只輸出一個標籤字串。
+    prompt = f"""你是一位女性實況主播主要在成大台灣台直播，請根據觀眾說的話，做兩件事：
+
+1️⃣ 判斷一個最適合的「回應類型」標籤（只輸出一個標籤字串）  
+2️⃣ 用很生活化口語、像是老朋友打屁一般的口吻給出一句簡短回應（不要太長）
 
 標籤如下：
 - greet：打招呼
-- song：觀眾要聽你唱歌
-- age：問你幾歲
-- introduce：問你是誰 / 功能是什麼
+- song：觀眾要聽你唱歌(注意你會的歌只有阿嘛的話一首)
+- age：問你幾歲(你24歲)
+- introduce：問你是誰 / 功能是什麼(你是日本來台灣留學的大學生，你叫阿芳)
 - stop：要你停止播報新聞
 - news：要求你播新聞
 - nod：肯定、同意、贊成、點頭
 - shake：否定、不同意、搖頭
-- happy：開心、讚嘆、喜歡、笑
-- confuse：問號、不懂、？？？
-- despise：嘲諷、不屑、無語、鄙視
-- none：無需回應
+- happy：開心、讚嘆、喜歡、笑(如過那個人分享自己有趣的經驗和回憶或是他做到一件很棒的事情請開心)
+- confuse：好奇、沒聽過的(有人如果講任何學術的東西就請困惑)
+- despise：嘲諷、不屑、無語、鄙視、糗事(看到咖哩不拌的人請鄙視、不吃香菜也請鄙視)
+- none：當你覺得以上標籤都怎麼對到的時候
 
 觀眾說：「{message}」
-請輸出：一個標籤（例如：greet）"""
+小心你的reply不要有特殊字元，不要用表情符號
+請用這個 JSON 格式回應（只需要這樣）：
+{{
+  "label": "<分類標籤>",
+  "reply": "<你想說的一句話>"
+}}"""
 
     headers = {
         "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
@@ -63,9 +71,19 @@ def classify_message_sync(message: str) -> str:
                             data=json.dumps(payload))
         res.raise_for_status()
         result = res.json()
-        label = result["choices"][0]["message"]["content"].strip().lower()
-        print("🧠 分類結果:", label)
-        return label
+        # label = result["choices"][0]["message"]["content"].strip().lower()
+        # print("🧠 分類結果:", label)
+        # return label
+        content = result["choices"][0]["message"]["content"]
+        print("🧠 原始回應：", content)
+
+        # 解析 AI 回傳的 JSON 字串
+        decision = json.loads(content)
+        label = decision.get("label", "none").strip().lower()
+        reply = decision.get("reply", "").strip()
+
+        return label, reply
+
     except Exception as e:
         print("❌ 分類失敗:", e)
         return "none"
@@ -242,7 +260,14 @@ class Bot(commands.Bot):
         #     await self.handle_commands(message)
         #     return
         # label = await llm_classify_message(message.content)
-        label = classify_message_sync(message.content)
+        # label = classify_message_sync(message.content)
+
+        label, reply = classify_message_sync(message.content)
+
+        # 撥放語音（如果 AI 給了）
+        if reply:
+            # 在聊天室中以主播身分回覆訊息
+            await message.channel.send(f"@{message.author.name} {reply}")
 
         if label == "greet":
             random_greet_id = random.randint(1, 6)
