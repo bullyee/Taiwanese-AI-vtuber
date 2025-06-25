@@ -27,7 +27,7 @@ class SubtitleWindow(QWidget):
         self.label.setFixedWidth(MAX_W)
         self.label.setStyleSheet("""
             QLabel {
-                color: white;
+                color: black;
                 font: 32px "LXGW WenKai";
                 background: transparent;
                 padding: 10px;

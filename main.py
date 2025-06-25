@@ -66,7 +66,7 @@ sched = SubtitleScheduler(
     set_image = image.set_image  # ✅ 新增圖片控制 callback
 )
 
-bot = Bot(sched,NewsPool,DEVICE_ID)
+bot = Bot(vts,sched,NewsPool,DEVICE_ID)
 # ✅ 建立 Twitch bot 執行緒
 bot_thread = threading.Thread(target=bot.run, name="TwitchBotThread", daemon=True)
 bot_thread.start()
@@ -81,12 +81,12 @@ bot_thread.start()
 # news_timer.timeout.emit()                # 立刻播第一條（可拿掉）
 
 # ---------- 20 秒 VTS 動畫 ----------
-anim_timer = QTimer()
-def trigger_random_animation():
-    hk = random.choice(HOTKEY_POOL)
-    vts.trigger_hotkey(hk)
-anim_timer.timeout.connect(trigger_random_animation)
-anim_timer.start(45 * 1000)
+# anim_timer = QTimer()
+# def trigger_random_animation():
+#     hk = random.choice(HOTKEY_POOL)
+#     vts.trigger_hotkey(hk)
+# anim_timer.timeout.connect(trigger_random_animation)
+# anim_timer.start(45 * 1000)
 
 # ---------- 執行 ----------
 sys.exit(app.exec())

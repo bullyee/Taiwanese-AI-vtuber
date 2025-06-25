@@ -15,9 +15,11 @@ from audio_vac import play_wav_to_device, stop_playback
 from combine_audio import combine_audio_files, process_and_combine_audio
 from scheduler import SubtitleScheduler
 from voicevox_tts import generate_greeting_audio
+from vts_client import VTSClient
+
 
 class Bot(commands.Bot):
-    def __init__(self,sched: SubtitleScheduler,NewsPool: List[Tuple[str, List[Tuple[str, str | None] ],int ]],DEVICE_ID: int):
+    def __init__(self,vts: VTSClient, sched: SubtitleScheduler,NewsPool: List[Tuple[str, List[Tuple[str, str | None] ],int ]],DEVICE_ID: int):
 
         load_dotenv()
         twitch_token = os.environ.get('TWITCH_OAUTH_TOKEN')
@@ -33,12 +35,14 @@ class Bot(commands.Bot):
             prefix='!',
             initial_channels=[twitch_channel]
         )
+        self.vts = vts
         self.sched = sched
         self.NewsPool = NewsPool
         self.DEVICE_ID = DEVICE_ID
 
         self.news_timer = None  # 用於儲存 QTimer 實例
         self.is_playing_news = False  # 標誌新聞是否正在播放
+        self.HOTKEY_POOL = [f"My Animation {i}" for i in range(1, 4)]
 
     async def event_ready(self):
         print(f'Logged in as | {self.nick}')
@@ -79,6 +83,11 @@ class Bot(commands.Bot):
 
         # 將訊息內容轉換為小寫，方便不區分大小寫的匹配
         message_content_lower = message.content.lower()
+
+            # 動作
+        def trigger_random_animation():
+            hk = random.choice(self.HOTKEY_POOL)
+            self.vts.trigger_hotkey(hk)
 
         # 停止
         if re.search('|'.join(re.escape(k.lower()) for k in stop_keywords), message_content_lower):
