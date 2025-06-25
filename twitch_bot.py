@@ -81,13 +81,46 @@ class Bot(commands.Bot):
         ]
 
 
+
+
         # 將訊息內容轉換為小寫，方便不區分大小寫的匹配
         message_content_lower = message.content.lower()
 
-            # 動作
+        # 動作
         def trigger_random_animation():
             hk = random.choice(self.HOTKEY_POOL)
             self.vts.trigger_hotkey(hk)
+
+        # 🔹 角色動作觸發區
+        if re.search(r"點頭|yes|好|同意|贊成|嗯|點個頭", message_content_lower):
+            print("✅ 偵測到點頭指令")
+            self.vts.nod_head()
+            await self.handle_commands(message)
+            return
+
+        if re.search(r"搖頭|no|不要|不同意|否定|不行|不准", message_content_lower):
+            print("✅ 偵測到搖頭指令")
+            self.vts.shake_head()
+            await self.handle_commands(message)
+            return
+
+        if re.search(r"鄙視|看不起|切|哼|嘖|什麼鬼|低級|無言", message_content_lower):
+            print("✅ 偵測到鄙視指令")
+            self.vts.despise()
+            await self.handle_commands(message)
+            return
+
+        if re.search(r"開心|快樂|爽|笑死|喜歡|好耶|哈|嗨起來", message_content_lower):
+            print("✅ 偵測到開心指令")
+            self.vts.happy()
+            await self.handle_commands(message)
+            return
+
+        if re.search(r"困惑|疑惑|不懂|？？|為什麼|問號|不解|confused|what", message_content_lower):
+            print("✅ 偵測到困惑指令")
+            self.vts.confuse()
+            await self.handle_commands(message)
+            return
 
         # 停止
         if re.search('|'.join(re.escape(k.lower()) for k in stop_keywords), message_content_lower):
