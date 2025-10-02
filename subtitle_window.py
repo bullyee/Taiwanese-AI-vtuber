@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QSizePolicy, QHBoxLayout
-from PyQt6.QtGui import QGuiApplication, QPalette
-from PyQt6.QtCore    import Qt
+from PyQt6.QtGui import QGuiApplication, QPalette, QFont
+from PyQt6.QtCore    import Qt, QTimer, QPoint
 
 MAX_W = 1000
 
@@ -10,18 +10,25 @@ class SubtitleWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Subtitle")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
-        self.setWindowOpacity(0.0)           # 背景全透，文字不透
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setWindowFlag(
+             Qt.WindowType.FramelessWindowHint |
+             Qt.WindowType.WindowStaysOnTopHint
+             # Qt.WindowType.Tool # 使用 Tool 類型可以避免在任務欄顯示
+        )
+        # self.setWindowOpacity(0.0)           # 背景全透，文字不透
+
+        #self.setStyleSheet("background-color: white;")
 
         # ---- 字幕 QLabel ----
-        self.label = QLabel("Count 0", self)
+        self.label = QLabel("", self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setWordWrap(True)                  # 若要截斷就關掉
         self.label.setFixedWidth(MAX_W)
         self.label.setStyleSheet("""
             QLabel {
-                color: white;
-                font: 28px "Microsoft JhengHei";
+                color: black;
+                font: 32px "LXGW WenKai";
                 background: transparent;
                 padding: 10px;
             }
@@ -65,65 +72,78 @@ class TitleBannerWidget(QWidget):
         super().__init__()
         self.setWindowTitle("Title Banner")
 
-        # 如果你要看到背景顏色，**不要**開啟整窗透明
-        # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-
-        # 半透明/透明可以留著，但要確定有 `WA_StyledBackground`
-        # self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        # ==== 背景設定 ====
+        # 讓 OBS 可以擷取，但畫面上看不到（整窗透明）
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowOpacity(0.0)
-        self.setFixedSize(1370, 150)
+        self.setFixedSize(1200, 200)
+        self.setStyleSheet("background-color: #33ccc9;")
 
-        # ---- 文字 QLabel ----
-        self.label = QLabel("中職／悍將需大破尋求大立 拚下半季洋投需Fired for all", self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self.label.setWordWrap(True)
-        self.label.setFixedWidth(1400)
-        self.label.setSizePolicy(QSizePolicy.Policy.Expanding,
-                                 QSizePolicy.Policy.Preferred)  # 讓 label 拉滿寬度
-        self.label.setStyleSheet("""
-            QLabel {
-                color: black;
-                font: 50px "Microsoft JhengHei";
-                background: transparent;
-                padding: 10px 40px;
-            }
-        """)
+        # === 兩個 label 用來跑同一段字 ===
+        self.label1 = QLabel(self)
+        self.label2 = QLabel(self)
 
-        # ---- Layout：置頂靠左 ----
-        lay = QHBoxLayout(self)
-        lay.addWidget(self.label,
-                      alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        lay.setContentsMargins(0, 0, 0, 0)
+        for label in (self.label1, self.label2):
+            label.setText("歡迎來到成大台灣台，我是主播阿芳，大家可以透過聊天室和我即時互動")
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            label.setWordWrap(False)
+            label.setFixedHeight(180)  # 避免換行
+            label.setStyleSheet("""
+                QLabel {
+                    color: #d1d1d1;
+                    font: 80px "jf open 粉圓";
+                    background: transparent;
+                    padding: 10px 35px;
+                }
+            """)
+            label.adjustSize()
 
-        # 給整個視窗一個底色
-        self.setStyleSheet("background-color: #eb3c1e;")
+        # 初始位置
+        self.label1.move(0, 20)
+        self.label2.move(self.label1.width(), 20)
 
-        self.adjustSize()
+        # === 計時器滾動字幕 ===
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.scroll_text)
+        self.timer.start(20)
+
+        # === 置頂畫面中央 ===
         self._reposition_top()
         self.show()
 
-    # -------- 置頂中央（若想整窗貼左，把第一個參數改 0 即可） --------
+    def scroll_text(self):
+        # 移動兩個 label
+        for label in (self.label1, self.label2):
+            label.move(label.x() - 2, label.y())
+
+        # 如果 label1 完全離開左邊，放到 label2 的右邊
+        if self.label1.x() + self.label1.width() < 0:
+            self.label1.move(self.label2.x() + self.label2.width(), self.label1.y())
+
+        # 同理，label2 離開就放到 label1 的右邊
+        if self.label2.x() + self.label2.width() < 0:
+            self.label2.move(self.label1.x() + self.label1.width(), self.label2.y())
+
+    # -------- 置頂中央（若想整窗靠左，把第一個參數改 0） --------
     def _reposition_top(self):
         screen = QGuiApplication.primaryScreen().geometry()
-        self.move(  # 視窗本身仍置中；若要連視窗一起靠左，x 改 0
-            (screen.width() - self.width()) // 2,
-            0
-        )
+        self.move((screen.width() - self.width()) // 2, 0)
 
-    # -------- 對外 API --------
+    # -------- 對外 API：動態設定字幕 --------
     def set_text(self, txt: str):
         if not txt:
-            self.label.clear()
+            for label in (self.label1, self.label2):
+                label.clear()
             self.resize(1, 1)
             self.showMinimized()
             return
 
-        self.label.setText(txt)
-        self.label.adjustSize()
-        self.adjustSize()
-        self._reposition_top()
+        for label in (self.label1, self.label2):
+            label.setText(txt)
+            label.adjustSize()
+        self.label1.move(0, self.label1.y())
+        self.label2.move(self.label1.width(), self.label2.y())
         self.showNormal()
 
 if __name__ == "__main__":

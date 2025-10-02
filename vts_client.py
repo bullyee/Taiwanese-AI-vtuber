@@ -1,4 +1,5 @@
 import asyncio, json, websockets, uuid, pathlib, threading, queue
+import time
 
 WS_URL      = "ws://127.0.0.1:8001"
 PLUGIN_NAME = "VAC_Control_Python"
@@ -12,6 +13,22 @@ class VTSClient:
         self.thread.start()
 
     # ---------- 對外 API ----------
+    # ▶️ 這裡是你要加的「動作 API」
+    def nod_head(self):
+        self.trigger_hotkey("nod_head")
+
+    def shake_head(self):
+        self.trigger_hotkey("shake_head")
+
+    def despise(self):
+        self.trigger_hotkey("despise")
+
+    def happy(self):
+        self.trigger_hotkey("happy")
+
+    def confuse(self):
+        self.trigger_hotkey("confuse")
+
     def trigger_hotkey(self, hotkey_id: str):
         """把 Hotkey ID 丟進佇列；GUI 執行緒呼叫也安全"""
         try:
@@ -63,3 +80,14 @@ class VTSClient:
 
     def _run(self):
         asyncio.run(self._producer())
+
+if __name__ == "__main__":
+    vts = VTSClient()
+    # 給 WebSocket thread 一點時間建立連線（重要）
+    time.sleep(2)
+
+    # 執行測試動作
+    print("👉 測試：nod_head()")
+    vts.nod_head()
+
+    time.sleep(1.5)

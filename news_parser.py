@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import socket
 import struct
+import urllib.request
 
 # TTS API Client
 class TTSClient:
@@ -49,7 +50,7 @@ class TTSClient:
 
 # 爬蟲函式
 def crawl_udn_news():
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'}
     url = 'https://udn.com/news/cate/2/7227'
 
     try:
@@ -62,12 +63,15 @@ def crawl_udn_news():
             return []
 
         results = []
+        os.makedirs("images", exist_ok=True)  # 創建 images 目錄
 
-        for item in news_items:
+        for news_idx, item in enumerate(news_items, 1):
+            # 提取標題
             title_tag = item.select_one('.story-list__text h2 a')
             title = title_tag.get_text(strip=True) if title_tag else '無標題'
             link = title_tag['href'] if title_tag and 'href' in title_tag.attrs else None
             if not link:
+                print(f"新聞 '{title}' 無有效連結，跳過內容爬取。")
                 continue
             if not link.startswith('http'):
                 link = 'https://udn.com' + link
@@ -77,6 +81,7 @@ def crawl_udn_news():
                 article_response.raise_for_status()
                 article_soup = BeautifulSoup(article_response.text, 'html.parser')
 
+                # 提取時間
                 time_tag = article_soup.select_one('.article-content__subinfo time')
                 time = time_tag.get_text(strip=True) if time_tag else '無時間'
                 try:
@@ -84,15 +89,37 @@ def crawl_udn_news():
                 except ValueError:
                     time = '時間格式錯誤'
 
+                # 移除內文插圖
                 for figure in article_soup.select('.article-content__editor figure'):
                     figure.decompose()
 
+                # 提取封面圖片並下載
+                cover_image = article_soup.select_one('figure.article-content__cover img')
+                image_url = cover_image['src'] if cover_image and 'src' in cover_image.attrs else None
+                if image_url:
+                    try:
+                        image_response = requests.get(image_url, headers=headers)
+                        image_response.raise_for_status()
+                        image_extension = image_url.split('.')[-1].split('&')[0]  # 提取檔案副檔名
+                        image_path = f"images/news{news_idx}_image.{image_extension}"
+                        with open(image_path, 'wb') as f:
+                            f.write(image_response.content)
+                    except requests.RequestException as e:
+                        print(f"無法下載新聞 '{title}' 的封面圖片：{e}")
+                        image_path = None
+                else:
+                    image_path = None
+
+                # 移除封面圖片的 figcaption
+                cover_figcaption = article_soup.select_one('figure.article-content__cover figcaption')
+                if cover_figcaption:
+                    cover_figcaption.decompose()
+
+                # 提取主要內容
                 content_paragraphs = article_soup.select('.article-content__paragraph .article-content__editor p')
                 content = []
                 for p in content_paragraphs:
-                    if p.find_parent('div', style=re.compile('position: relative;.*background-color:#fff')):
-                        continue
-                    if p.find_parent('figure', class_='article-content__cover'):
+                    if p.find_parent('div', style=re.compile(r'position: relative;.*background-color:#fff')):
                         continue
                     text = p.get_text(strip=True)
                     if text:
@@ -100,21 +127,18 @@ def crawl_udn_news():
 
                 content_text = '\n'.join(content) if content else '無內文'
 
-                # 分句處理：以 。！？或。」 為結尾
+                # 分句處理：以 。、！、？、， 或 。」 為結尾
                 sentences = []
                 current = ""
                 i = 0
                 while i < len(content_text):
                     current += content_text[i]
-                    if content_text[i] in "。！？":
-                        if i + 1 < len(content_text) and content_text[i + 1] == "」":
+                    if content_text[i] in "。！？,，":
+                        if i + 1 < len(content_text) and content_text[i] == "。" and content_text[i + 1] == "」":
                             current += "」"
                             i += 1
                         sentences.append(current.strip())
                         current = ""
-                    # elif content_text[i] == "」":
-                    #     sentences.append(current.strip())
-                    #     current = ""
                     i += 1
                 if current.strip():
                     sentences.append(current.strip())
@@ -123,7 +147,8 @@ def crawl_udn_news():
                     'title': title,
                     'time': time,
                     'content': content_text,
-                    'verbatim': sentences
+                    'verbatim': sentences,
+                    'image': image_path
                 }
                 results.append(news_item)
 
@@ -142,13 +167,10 @@ if __name__ == "__main__":
     os.makedirs("audio", exist_ok=True)
 
     tts_client = TTSClient(host="140.116.245.157", token="mi2stts")
-    news_list = crawl_udn_news()               # 取得五篇新聞
+    news_list = crawl_udn_news()  # 取得新聞
 
     for news_idx, news in enumerate(news_list, 1):
-        # 顯示標題與時間
         print(f"[新聞 {news_idx}] {news['title']} ({news['time']})")
-
-        # 收集逐句內容，做成 content1
         content1 = {}
         for sent_idx, sentence in enumerate(news['verbatim'], 1):
             print(f"  ({sent_idx}) {sentence}")
@@ -159,19 +181,16 @@ if __name__ == "__main__":
                 model="M12",
                 output_path=filename
             )
-            content1[str(sent_idx)] = sentence  # 用字串當 key
+            content1[str(sent_idx)] = sentence
 
+        print(f"  圖片: {news['image'] if news['image'] else '無圖片'}")
         print("-" * 40)
 
-        # 把索引與 content1 直接寫回這筆新聞
         news["news_idx"] = news_idx
-
-        # （如果不想保留原本的全文或逐句稿，可選擇刪掉）
-        del news["content"]       # 若不需要全文
-        del news["verbatim"]      # 若不需要逐句 list
+        del news["content"]
+        del news["verbatim"]
         news["content"] = content1
 
-    # 所有新聞處理完，一次輸出
     with open("news.json", "w", encoding="utf-8") as f:
         json.dump(news_list, f, ensure_ascii=False, indent=2)
 
